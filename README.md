@@ -2,11 +2,17 @@
 
 In this project, I am designing machine learning models that predict ecological niches based on genomic data and identifying conserved ESKAPEE genes related to pathogenicity based on niche localization. Based on proportion of genomes passing quality metrics, I am starting with A. Baumannii genomes
 
+## **Workflow**
+![picture of workflow](https://github.com/angehuy/ESKAPEE_brownlab/blob/main/figures/Brown_Workflow.png)
 
 ## **Current progress that repo reflects**
 * Processed genomic metadata retrieved from NCBI GenBank and assessed genome quality metrics, including CheckM contamination, completeness, number of contigs, and N50 contig size
 * Completed feature creation by categorizing niches based on a combination of host disease and isolation source metadata
 * Made supplementary plots of genome quality and niche proportions
+* Plot of Clonal Clusters Showing Proportion of Niches
+![picture of bar plot](https://github.com/angehuy/ESKAPEE_brownlab/blob/main/figures/Brown_CloneStacked.png)
+* Sankey Plot of Genomovars Mapped to Niches
+![picture of Sankey plot](https://github.com/angehuy/ESKAPEE_brownlab/blob/main/figures/Brown_GenomovarSankey.png)
 
 ## **Commands (for personal reference)**
 ```
