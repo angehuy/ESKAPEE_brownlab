@@ -1,6 +1,6 @@
-## Characterizing and Predicting the Niche-Specific Genomic Features of ESKAPEE Pathogens
+## Characterizing and Predicting the Niche-Specific Genomic Features of ESK(A)PEE Pathogens
 
-In this project, I am designing machine learning models that predict ecological niches based on genomic data and identifying conserved ESKAPEE genes related to pathogenicity based on niche localization. 
+In this project, I am designing machine learning models that predict ecological niches based on genomic data and identifying conserved ESKAPEE genes related to pathogenicity based on niche localization. Based on proportion of genomes passing quality metrics, I am starting with A. Baumannii genomes
 
 
 ## **Current progress that repo reflects**
