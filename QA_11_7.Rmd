@@ -1,0 +1,375 @@
+---
+title: "Quality Assurance Automated CheckM and Genome Count"
+output: html_document
+date: "2024-11-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Download libraries
+
+library(tidyverse)
+library(data.table)
+library(janitor)
+library(readr)
+library(ggplot2)
+library(rstatix)
+library(ggview)
+library(readxl)
+library(conflicted)
+
+conflict_scout()
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::combine)
+conflicts_prefer(dplyr::lag)
+conflicts_prefer(data.table::transpose)
+
+## Loading Data
+
+setwd("/Users/ahuynh/downloads/BrownLab")
+
+``` {r Niche Categorize}
+
+niche_categorize <- function(data) {
+    data %>%
+    
+    mutate(Niche = case_when(
+    grepl("urine|urinary tract infection|Clean-catch urine sample|clinical urine culture|urine cath|UTI|urine culture|urine       cathether|urine from Syrian refugee|Urine sample", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("UTI|Kidney failure|Urinary Tract Infection|Urinary tract infection|Urinary Tracts Infection",                 Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Urinary",
+    grepl("child cystic", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "early.CF",
+    grepl("cf|cystic|fibrosis", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("cf|cystic|fibrosis", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "CF",
+    grepl("bile|Bile fluid", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("end-stage liver disease", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Bile",
+    grepl("bacteremia|sepsis|blood stream infection|Blood|blood from patient with pneumonia|blood fluid|bloodstream", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("blood|sepsis|bloodstream infection|Blood stream infection", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Blood",
+    grepl("wound sectretion|sore|abscess|tissue|ulcer|lesion|sternal wound|wound|soldier combat wound|Wound secretion|wound abscess|surgical wound", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Wound",
+    grepl("skin swab|cutaneus swab|skin and soft tissue|Damaged skin", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Skin",
+    grepl("respiratory secretions|Pneumonia|pneumonia|respiratory secretion", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("Pneumonia|pneumonia|Bacterial Pneumonia", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Pneumonia",
+    grepl("Sputamentum|sputum|sputum from patient with respiratory tract infection", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Sputum",
+    grepl("perianal swab|perianal|anal|perianal isolate|anal swab|rectal|Rectal swab|Perirectal|Rectum|rectum|perirectal|rectal swab", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Rectal/Anal",
+    grepl("vitreous fluid from young man|patient fluids|purulent material|excreted bodily substance|bodily fluid|pus|Secreta|abscess|abdominal drainage fluid|Drainage samples from liver abscess|cerebrospinal fluid|penile discharge|cerebrospinal fluid|miscellaneous body fluid", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Bodily fluid/pus",
+    grepl("human", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Human",
+    grepl("bronchial|lower respiratory|bronch|trach|airway|alveolar|copd|lung|Bronchoscopy|Tracheal aspiration|pleural fluid|Bronchail secretion|bronchoalveolar lavage|Endobronchail swabBroncho-Alveolar Lavage|respiratory|Airway specimen|Tracheal secretion|endotracheal aspirate", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("pleumonia", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Respiratory/Lungs",
+    grepl("throat|Expectorate|throat swab|pharynx", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Throat",
+    grepl("Perineum", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Perineum",
+    grepl("ventilator|bed sheets|telephone of Nurse station|hospital|OP|clinical sample|patient room|hospital room swab|patient|bedside|rail|vent|nebuliser|treatment|nursing|button|ecg|syringe|icu|Abdominal drain tube|Central venous line|abdominal drainage|catheter tip|central venous catheter|Abdominal Abscess|lumbar drain tip", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Hospital",
+    grepl("Ear secretion", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Ear",
+    grepl("Thigh tissue", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Thighs",
+    grepl("soil|sand|dirt|agricultural field soil|soil|environment contaminated by Homo sapiens patients", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Terrestrial",
+    grepl("Environemnt", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Environment",
+    grepl("water|pipe|spring|lilypad|puddle|saltern|pool|pond|stream|surface water|urban river waters|river water|water sample from urban lake", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Aquatic",
+    grepl("jejunal aspirate|gut", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Intestine",
+    grepl("Vagina|endocervical swab", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Vagina/Cervix",
+    grepl("nose|nasal swab|sinus|nasal|nasopharynx", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Upper Respiratory",
+    grepl("Korean infant feces|fecal sample|stool|fecal swab|feces|fecal", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Feces",
+    grepl("garam masala hot spice mixture|retail chicken|Carrots|vegetable|milk|Parsley|Celery|Mint|tomato|carrot|Lettuce|Beet", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Food/Drinks",
+    grepl("Industrial effluent", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Industry",
+    grepl("Femoral bone", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Bone",
+    grepl("laboratory strain", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Lab strain",
+    grepl("runoff|pharma|waste|sewage|sludge|Wastewater Influent|Wastewater Effluent|Domestic sewage|drainage|wastewater|hospital sewage|the activated sludge of Harbin Taiping wastewater treatment plant|chromate-containing wastewater", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Sewage/Wastewater",
+    grepl("neck", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Neck",
+    grepl("urethral swab", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Urethra",
+    grepl("gall|Gall bladder|gallbladder isolate|Gall Bladder|Fluid gall bladder|Gallbladder Abscess", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Gall",
+    grepl("Liver cyst|\\bcyst\\b", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("Cystitis|acute cystitis", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Cyst",
+    grepl("Diaphragm tissue|skin and soft tissue", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Tissue",
+    grepl("shower|kitchen|drain|toilet|drinking|fountain|humidifier|metal|wood|plastic|truck swab|Sink", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Built Environment",
+    grepl("brain|brain bleed|brain Hemorrhage|Brain infraction|brain abscess|Brain congestion", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Brain",
+    grepl("cloacal swab|dog with urinary tract infection|wild-caught Atlantic blue crabs|animal|dog|cat|fish|dolphin|chicken|poultry|canine|pork|pig|veterinary|Turkey cecum|rugao ham", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Animal",
+    grepl("Burn Patient", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Burn",
+    grepl("eye|cornea|conjunctiva", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Eye",
+    grepl("ocean|sea|submarine", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Ocean",
+    grepl("plant|root|rhizo|tree|pepper|tomato|potato|onion|leaf|fruit|lettuce", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Plant",
+    TRUE ~ NA_character_
+  ))
+
+}
+
+
+```
+
+
+```{r Determine the number of genomes that passed CheckM according to each Niche}
+
+
+threshold_plot <- function(file_path, name) {
+
+    dat.tsv <- file_path
+    dat <- fread(dat.tsv)
+    names(dat) <- make.names(names(dat), unique = TRUE)
+
+    completness <- 98  # Not all genomes have this
+    contamination <- 2  # Not all genomes have this
+    contigs <- 300
+    n.50 <- 100000
+
+    dat_all <- dat %>%
+    filter(Assembly.Stats.Number.of.Contigs <= contigs & Assembly.Stats.Contig.N50 >= n.50)
+    dat.niches <- niche_categorize(dat_all)  # Niche df of all
+
+    checkm_df <- dat.niches %>%
+    group_by(Niche) %>%
+    filter(
+    !is.na(CheckM.completeness) &
+    !is.na(CheckM.contamination)
+    )
+    
+    title_combined = paste("Count of", name, "Genomes Based on CheckM Threshold")
+
+
+    # Among those with checkm, look at if they meet the CheckM completeness and contamination
+    # added another column where 1 = passed checkm and 0 = did not pass checkm
+    checkm_passed_df <- checkm_df %>% filter(!is.na(Niche)) %>%
+    mutate(checkm_status_passed = as.integer(CheckM.completeness >= completness & CheckM.contamination <= contamination))
+   
+    checkm_passed_summary <- checkm_passed_df %>%
+    count(Niche, checkm_status_passed)
+    
+    palette.colors(palette = "R4") # getting good colorblind friendly palettes
+    
+    ggplot(checkm_passed_summary, aes(x = fct_reorder(Niche, n, .desc = TRUE), fill = as.factor(checkm_status_passed))) +
+    geom_bar(aes(y = n), position = "stack", stat = "identity") +
+    ylab("Count") +
+    xlab("Niche") +
+    theme_minimal() +
+    labs(fill = "CheckM Status", title = title_combined) +
+    scale_fill_manual(values = c("0" = "#DF536B", "1" = "#61D04F"),  # Customize colors
+                      labels = c("0" = "Not Passed", "1" = "Passed")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+}
+
+
+EF_plot <- threshold_plot("/Users/ahuynh/downloads/BrownLab/EF_30K_GenomeMetadata.tsv", "E. faecium")
+SA_plot <- threshold_plot("/Users/ahuynh/downloads/BrownLab/SA_30K_GenomeMetadata.tsv", "S. aureus")
+KP_plot <- threshold_plot("/Users/ahuynh/downloads/BrownLab/KP_30K_GenomeMetadata.tsv", "K. pneumoniae")
+AB_plot <- threshold_plot("/Users/ahuynh/downloads/BrownLab/AB_30K_GenomeMetadata.tsv", "A. baumannii")
+PA_plot <- threshold_plot("/Users/ahuynh/downloads/BrownLab/PA_30K_GenomeMetadata.tsv", "P. aeruginosa")
+ESP_plot <- threshold_plot("/Users/ahuynh/downloads/BrownLab/ESP_30K_GenomeMetadata.tsv", "Enterobacter Sp.")
+EC_plot <- threshold_plot("/Users/ahuynh/downloads/BrownLab/EC_30K_GenomeMetadata.tsv", "E. coli")
+
+```
+
+
+
+
+```{r}
+EF_plot
+SA_plot
+KP_plot
+AB_plot
+PA_plot
+ESP_plot
+EC_plot
+
+```
+
+
+
+```{R Counts how many genomes passed threshold the thresholds overall}
+
+
+count_function <- function(file_path, name) {
+
+    dat.tsv <- file_path
+    dat <- fread(dat.tsv)
+    names(dat) <- make.names(names(dat), unique = TRUE)
+
+    completness <- 98  # Not all genomes have this
+    contamination <- 2  # Not all genomes have this
+    contigs <- 300
+    n.50 <- 100000
+
+    dat_all <- dat %>%
+    filter(Assembly.Stats.Number.of.Contigs <= contigs & Assembly.Stats.Contig.N50 >= n.50)
+    dat.niches <- niche_categorize(dat_all)  # Niche df of all
+
+    checkm_df <- dat.niches %>%
+    group_by(Niche) %>%
+    filter(
+    !is.na(CheckM.completeness) &
+    !is.na(CheckM.contamination)
+    )
+
+    # Among those with checkm, look at if they meet the CheckM completeness and contamination
+    # added another column where 1 = passed checkm and 0 = did not pass checkm
+    checkm_passed_df <- checkm_df %>% filter(!is.na(Niche)) %>%
+    mutate(checkm_status_passed = as.integer(CheckM.completeness >= completness & CheckM.contamination <= contamination))
+
+    num_passed <- nrow(checkm_passed_df[checkm_passed_df$checkm_status_passed == 1,])
+    num_not_passed <- nrow(checkm_passed_df[checkm_passed_df$checkm_status_passed != 1,])
+    num_total <- num_passed + num_not_passed
+    
+    printing <- paste(name, "Passed:", num_passed, "Total:", num_total)
+    return(printing)
+
+    
+}
+
+```
+
+
+```{r}
+
+count_function("/Users/ahuynh/downloads/BrownLab/EF_30K_GenomeMetadata.tsv", "E. faecium")
+count_function("/Users/ahuynh/downloads/BrownLab/SA_30K_GenomeMetadata.tsv", "S. aureus")
+count_function("/Users/ahuynh/downloads/BrownLab/KP_30K_GenomeMetadata.tsv", "K. pneumoniae")
+count_function("/Users/ahuynh/downloads/BrownLab/AB_30K_GenomeMetadata.tsv", "A. baumannii")
+count_function("/Users/ahuynh/downloads/BrownLab/PA_30K_GenomeMetadata.tsv", "P. aeruginosa")
+count_function("/Users/ahuynh/downloads/BrownLab/ESP_30K_GenomeMetadata.tsv", "Enterobacter Sp.")
+count_function("/Users/ahuynh/downloads/BrownLab/EC_30K_GenomeMetadata.tsv", "E. coli")
+
+```
+
+``` {r Genomes to download}
+
+genome_download <- function(file_path, name) {
+  
+  
+}
+
+
+dat.niches.passed %>% write_csv("/Users/ahuynh/downloads/BrownLab/01_Filter_New_Genomes_EC_30K_niche_metadata_UnFiltNiches.csv")
+dat.final <- dat.niches.passed %>% filter(!Niche %in% NA)
+dat.final %>% select(Assembly.Accession) %>% write.table(file = "/Users/ahuynh/downloads/BrownLab/genomesToDownload.txt", sep = "\t", row.names = F, col.names = F, quote = F)
+
+
+
+
+
+
+```
+
+setwd("/Users/ahuynh/downloads/BrownLab")
+
+dat.tsv <- "/Users/ahuynh/downloads/BrownLab/AB_30K_GenomeMetadata.tsv"
+
+dat <- fread(dat.tsv)
+
+names(dat) <- make.names(names(dat), unique = T)
+
+
+dat %>% select(Assembly.BioSample.Isolation.source) %>% unique()
+
+
+dat %>% na.omit() %>% 
+  filter(!Assembly.BioSample.Host.disease %in% c("", "not collected", "Not collected", "not applicable", "missing", "Unknown", "Missing")) %>% 
+  count(Assembly.BioSample.Host.disease) %>%
+  arrange(-n) %>%
+  filter(n > 10) %>%
+  ggplot(aes(x = reorder(Assembly.BioSample.Host.disease, desc(n)), y = n)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+  
+colnames(dat)
+completness <- 98 # Not all genomes have this
+contamination <- 2 # Not all genomes have this
+contigs <- 300
+n.50 <- 100000
+  
+dat_all <- dat %>%
+  filter(Assembly.Stats.Number.of.Contigs <= contigs & Assembly.Stats.Contig.N50 >= n.50)
+  
+  
+dat.passed <- dat_all %>%
+  filter(CheckM.completeness >= completness & CheckM.contamination <= contamination)
+
+
+
+dat.niches.passed <- dat.passed %>% 
+  mutate(Niche = case_when(
+    grepl("urine|urinary tract infection|Clean-catch urine sample|clinical urine culture|urine cath|UTI|urine culture|urine cathether|urine from Syrian refugee|Urine sample", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("UTI|Kidney failure|Urinary Tract Infection|Urinary tract infection|Urinary Tracts Infection", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Urinary",
+    grepl("child cystic", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "early.CF",
+    grepl("cf|cystic|fibrosis", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("cf|cystic|fibrosis", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "CF",
+    grepl("bile|Bile fluid", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("end-stage liver disease", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Bile",
+    grepl("bacteremia|sepsis|blood stream infection|Blood|blood from patient with pneumonia|blood fluid|bloodstream", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("blood|sepsis|bloodstream infection|Blood stream infection", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Blood",
+    grepl("wound sectretion|sore|abscess|tissue|ulcer|lesion|sternal wound|wound|soldier combat wound|Wound secretion|wound abscess|surgical wound", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Wound",
+    grepl("skin swab|cutaneus swab|skin and soft tissue|Damaged skin", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Skin",
+    grepl("respiratory secretions|Pneumonia|pneumonia|respiratory secretion", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("Pneumonia|pneumonia|Bacterial Pneumonia", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Pneumonia",
+    grepl("Sputamentum|sputum|sputum from patient with respiratory tract infection", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Sputum",
+    grepl("perianal swab|perianal|anal|perianal isolate|anal swab|rectal|Rectal swab|Perirectal|Rectum|rectum|perirectal|rectal swab", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Rectal/Anal",
+    grepl("vitreous fluid from young man|patient fluids|purulent material|excreted bodily substance|bodily fluid|pus|Secreta|abscess|abdominal drainage fluid|Drainage samples from liver abscess|cerebrospinal fluid|penile discharge|cerebrospinal fluid|miscellaneous body fluid", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Bodily fluid/pus",
+    grepl("human", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Human",
+    grepl("bronchial|lower respiratory|bronch|trach|airway|alveolar|copd|lung|Bronchoscopy|Tracheal aspiration|pleural fluid|Bronchail secretion|bronchoalveolar lavage|Endobronchail swabBroncho-Alveolar Lavage|respiratory|Airway specimen|Tracheal secretion|endotracheal aspirate", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("pleumonia", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Respiratory/Lungs",
+    grepl("throat|Expectorate|throat swab|pharynx", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Throat",
+    grepl("Perineum", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Perineum",
+    grepl("ventilator|bed sheets|telephone of Nurse station|hospital|OP|clinical sample|patient room|hospital room swab|patient|bedside|rail|vent|nebuliser|treatment|nursing|button|ecg|syringe|icu", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Hospital",
+    grepl("Ear secretion", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Ear",
+    grepl("Thigh tissue", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Thighs",
+    grepl("Abdominal drain tube|Central venous line|abdominal drainage|catheter tip|central venous catheter|Abdominal Abscess|lumbar drain tip", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Medical devices",
+    grepl("soil|sand|dirt|agricultural field soil|soil|environment contaminated by Homo sapiens patients", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Terrestrial",
+    grepl("Environemnt", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Environment",
+    grepl("water|pipe|spring|lilypad|puddle|saltern|pool|pond|stream|surface water|urban river waters|river water|water sample from urban lake", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Aquatic",
+    grepl("jejunal aspirate|gut", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Intestine",
+    grepl("Vagina|endocervical swab", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Vagina/Cervix",
+    grepl("nose|nasal swab|sinus|nasal|nasopharynx", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Upper.Respiratory",
+    grepl("Korean infant feces|fecal sample|stool|fecal swab|feces|fecal", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Feces",
+    grepl("garam masala hot spice mixture|retail chicken|Carrots|vegetable|milk|Parsley|Celery|Mint|tomato|carrot|Lettuce|Beet", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Food/Drinks",
+    grepl("Industrial effluent", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Industry",
+    grepl("Femoral bone", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Bone",
+    grepl("laboratory strain", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Lab strain",
+    grepl("runoff|pharma|waste|sewage|sludge|Wastewater Influent|Wastewater Effluent|Domestic sewage|drainage|wastewater|hospital sewage|the activated sludge of Harbin Taiping wastewater treatment plant|chromate-containing wastewater", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Sewage/Wastewater",
+    grepl("neck", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Neck",
+    grepl("urethral swab", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Urethra",
+    grepl("gall|Gall bladder|gallbladder isolate|Gall Bladder|Fluid gall bladder|Gallbladder Abscess", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Gall",
+    grepl("Liver cyst|\\bcyst\\b", Assembly.BioSample.Isolation.source, ignore.case = TRUE) | 
+    grepl("Cystitis|acute cystitis", Assembly.BioSample.Host.disease, ignore.case = TRUE) ~ "Cyst",
+    grepl("Diaphragm tissue|skin and soft tissue", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Tissue",
+    grepl("shower|kitchen|drain|toilet|drinking|fountain|humidifier|metal|wood|plastic|truck swab|Sink", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Built.Environment",
+    grepl("brain|brain bleed|brain Hemorrhage|Brain infraction|brain abscess|Brain congestion", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Brain",
+    grepl("cloacal swab|dog with urinary tract infection|wild-caught Atlantic blue crabs|animal|dog|cat|fish|dolphin|chicken|poultry|canine|pork|pig|veterinary|Turkey cecum|rugao ham", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Animal",
+    grepl("Burn Patient", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Burn",
+    grepl("eye|cornea|conjunctiva", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Eye",
+    grepl("ocean|sea|submarine", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Ocean",
+    grepl("plant|root|rhizo|tree|pepper|tomato|potato|onion|leaf|fruit|lettuce", Assembly.BioSample.Isolation.source, ignore.case = TRUE) ~ "Plant",
+    TRUE ~ NA_character_
+  ))
+
+
+
+
+dat.niches.passed %>% write_csv("/Users/ahuynh/downloads/BrownLab/01_Filter_New_Genomes_AB_30K_niche_metadata_UnFiltNiches_new.csv")
+dat.final <- dat.niches.passed %>% filter(!Niche %in% NA)
+
+dat.final %>% 
+  count(Niche) %>%
+  arrange(-n) %>%
+  filter(n > 10) %>%
+  ggplot(aes(x = reorder(Niche, desc(n)), y = n)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+  
+nrow(dat.final)
+
+nrow(dat) # 29,484 original A. baumanii
+nrow(dat.passed) # 6,1457 genomes that passed contigs, n50, etc. metrics
+# ^ same number as dat.niches.passed (basically categorizing into niche including NA)
+nrow(dat.final) # 3,925 genomes that passed quality thresholds and were able to be categorized into niches
+
+
+# Assuming 'df' is your dataframe
+AB_accession <- dat.final [, 1]
+AB_accession_niche <- dat.final[,c(1,15)]
+
+
+AB_accession %>% write.table(file = "/Users/ahuynh/downloads/BrownLab/ABgenomesToDownload_new.txt", sep = "\t", row.names = F, col.names = F, quote = F) # 3,925 genomes for A B
+
+
+AB_accession_niche %>% write.table(file = "/Users/ahuynh/downloads/BrownLab/ABgenomes_niche.txt", sep = "\t", row.names = F, col.names = T, quote = F) 
+
+
+# 13,597 for E Coli genes
+
+
+
